@@ -86,13 +86,13 @@ SentinelSight combines proven patterns from industry-leading surveillance platfo
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/baithiprashanth07/SentinelSight.git
 cd sentinel-sight
 ```
 
 2. **Create environment file**
 ```bash
-cp .env.example .env
+cp .env
 # Edit .env with your configuration
 ```
 
