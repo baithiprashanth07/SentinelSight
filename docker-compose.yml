@@ -1,0 +1,170 @@
+version: "3.8"
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: sentinel-sight-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-sentinel_sight}
+      MYSQL_USER: ${DB_USER:-sentinel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-sentinel123}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - sentinel-network
+
+  # Redis for caching and queuing
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-sight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 3s
+      retries: 5
+    networks:
+      - sentinel-network
+
+  # MQTT Broker (optional, for event publishing)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sentinel-sight-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mqtt_data:/mosquitto/data
+    networks:
+      - sentinel-network
+
+  # API Service (Node.js/Express)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: sentinel-sight-api
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://${DB_USER:-sentinel}:${DB_PASSWORD:-sentinel123}@db:3306/${DB_NAME:-sentinel_sight}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      VITE_APP_ID: ${VITE_APP_ID}
+      OAUTH_SERVER_URL: ${OAUTH_SERVER_URL}
+      VITE_OAUTH_PORTAL_URL: ${VITE_OAUTH_PORTAL_URL}
+      OWNER_OPEN_ID: ${OWNER_OPEN_ID}
+      OWNER_NAME: ${OWNER_NAME}
+      BUILT_IN_FORGE_API_URL: ${BUILT_IN_FORGE_API_URL}
+      BUILT_IN_FORGE_API_KEY: ${BUILT_IN_FORGE_API_KEY}
+      VITE_FRONTEND_FORGE_API_URL: ${VITE_FRONTEND_FORGE_API_URL}
+      VITE_FRONTEND_FORGE_API_KEY: ${VITE_FRONTEND_FORGE_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./dist:/app/dist
+      - ./client/dist:/app/client/dist
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+
+  # Ingestion Service (Python)
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    container_name: sentinel-sight-ingestion
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: mysql://${DB_USER:-sentinel}:${DB_PASSWORD:-sentinel123}@db:3306/${DB_NAME:-sentinel_sight}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./services:/app/services
+      - ./logs:/app/logs
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+
+  # Inference Service (Python)
+  inference:
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    container_name: sentinel-sight-inference
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: mysql://${DB_USER:-sentinel}:${DB_PASSWORD:-sentinel123}@db:3306/${DB_NAME:-sentinel_sight}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+      GPU_ENABLED: ${GPU_ENABLED:-false}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./services:/app/services
+      - ./models:/app/models
+      - ./logs:/app/logs
+    networks:
+      - sentinel-network
+    # Uncomment for GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  # Rules Engine Service (Python)
+  rules-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.rules
+    container_name: sentinel-sight-rules
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: mysql://${DB_USER:-sentinel}:${DB_PASSWORD:-sentinel123}@db:3306/${DB_NAME:-sentinel_sight}
+      MQTT_BROKER: mqtt://mqtt:1883
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      - db
+      - redis
+      - mqtt
+    volumes:
+      - ./services:/app/services
+      - ./logs:/app/logs
+    networks:
+      - sentinel-network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
+  redis_data:
+    driver: local
+  mqtt_data:
+    driver: local
+
+networks:
+  sentinel-network:
+    driver: bridge

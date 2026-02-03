@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1769072832626,
+      "tag": "0000_cute_forgotten_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769073023758,
+      "tag": "0001_material_dagger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769073226598,
+      "tag": "0002_smart_lockjaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1769073516844,
+      "tag": "0003_superb_emma_frost",
+      "breakpoints": true
+    }
+  ]
+}
