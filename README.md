@@ -364,6 +364,9 @@ kubectl apply -f k8s/
 - **Architecture**: See `ARCHITECTURE.md`
 - **API**: See OpenAPI spec (future)
 
+## Final output
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/004746e4-bf2f-4012-8dd8-f8ca9687daca" />
+
 ## License
 
 MIT License - See LICENSE file for details
